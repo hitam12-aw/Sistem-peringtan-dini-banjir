@@ -14,21 +14,17 @@ export default function LoginPage() {
   async function handleLogin() {
     setLoading(true);
     setError("");
-
     const { data, error } = await supabase
       .from("admin")
       .select("*")
       .eq("username", username)
       .eq("password", password)
       .single();
-
     if (error || !data) {
       setError("Username atau password salah!");
       setLoading(false);
       return;
     }
-
-    // Simpan session sederhana
     localStorage.setItem("admin_logged_in", "true");
     localStorage.setItem("admin_username", data.username);
     router.push("/admin");
@@ -36,85 +32,101 @@ export default function LoginPage() {
 
   return (
     <div style={{
-      minHeight: "100vh", background: "#080c12",
+      minHeight: "100vh",
+      background: "linear-gradient(135deg, #2980b9 0%, #3498db 50%, #5dade2 100%)",
       display: "flex", alignItems: "center", justifyContent: "center",
-      padding: 16,
+      padding: 16, fontFamily: "'Segoe UI', system-ui, sans-serif",
     }}>
-      <div style={{
-        background: "rgba(255,255,255,0.03)",
-        border: "1px solid rgba(255,255,255,0.08)",
-        borderRadius: 12, padding: "40px 36px",
-        width: "100%", maxWidth: 380,
-      }}>
+      <div style={{ width: "100%", maxWidth: 360 }}>
         {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div style={{ fontSize: 36, marginBottom: 8 }}>💧</div>
-          <div style={{ fontFamily: "monospace", fontSize: 18, fontWeight: 900, color: "#ddd", letterSpacing: 2 }}>SIBANJIR</div>
-          <div style={{ fontFamily: "monospace", fontSize: 10, color: "#444", letterSpacing: 3, marginTop: 4 }}>ADMIN PANEL</div>
-        </div>
-
-        {/* Form */}
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ fontFamily: "monospace", fontSize: 10, color: "#555", letterSpacing: 2, display: "block", marginBottom: 6 }}>USERNAME</label>
-          <input
-            type="text"
-            value={username}
-            onChange={e => setUsername(e.target.value)}
-            placeholder="admin"
-            style={{
-              width: "100%", background: "rgba(255,255,255,0.05)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: 6, padding: "10px 14px",
-              color: "#ddd", fontFamily: "monospace", fontSize: 13,
-              outline: "none", boxSizing: "border-box",
-            }}
-          />
-        </div>
-
-        <div style={{ marginBottom: 24 }}>
-          <label style={{ fontFamily: "monospace", fontSize: 10, color: "#555", letterSpacing: 2, display: "block", marginBottom: 6 }}>PASSWORD</label>
-          <input
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            placeholder="••••••••"
-            onKeyDown={e => e.key === "Enter" && handleLogin()}
-            style={{
-              width: "100%", background: "rgba(255,255,255,0.05)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: 6, padding: "10px 14px",
-              color: "#ddd", fontFamily: "monospace", fontSize: 13,
-              outline: "none", boxSizing: "border-box",
-            }}
-          />
-        </div>
-
-        {error && (
           <div style={{
-            background: "rgba(255,61,90,0.1)", border: "1px solid rgba(255,61,90,0.3)",
-            borderRadius: 6, padding: "10px 14px",
-            fontFamily: "monospace", fontSize: 11, color: "#ff3d5a",
-            marginBottom: 16,
-          }}>
-            ■ {error}
-          </div>
-        )}
+            width: 72, height: 72, borderRadius: "50%",
+            background: "rgba(255,255,255,0.2)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            margin: "0 auto 12px", fontSize: 36,
+            border: "2px solid rgba(255,255,255,0.4)",
+          }}>💧</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#fff", letterSpacing: 1 }}>SIBANJIR</div>
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", marginTop: 4 }}>Sistem Peringatan Dini Banjir</div>
+        </div>
 
-        <button
-          onClick={handleLogin}
-          disabled={loading}
-          style={{
-            width: "100%", background: loading ? "rgba(0,229,160,0.1)" : "rgba(0,229,160,0.15)",
-            border: "1px solid rgba(0,229,160,0.4)",
-            borderRadius: 6, padding: "12px",
-            color: "#00e5a0", fontFamily: "monospace",
-            fontSize: 12, fontWeight: 700, letterSpacing: 2,
-            cursor: loading ? "not-allowed" : "pointer",
-            transition: "all 0.2s",
-          }}
-        >
-          {loading ? "MEMVERIFIKASI..." : "LOGIN →"}
-        </button>
+        {/* Card */}
+        <div style={{
+          background: "#fff", borderRadius: 20,
+          padding: "28px 24px",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
+        }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "#333", marginBottom: 20 }}>Login </div>
+
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ fontSize: 12, color: "#666", display: "block", marginBottom: 6, fontWeight: 600 }}>Username</label>
+            <input
+              type="text"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              placeholder="Masukkan username"
+              style={{
+                width: "100%", background: "#f8f9fa",
+                border: "1px solid #e9ecef",
+                borderRadius: 10, padding: "12px 14px",
+                fontSize: 14, color: "#333", outline: "none",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ fontSize: 12, color: "#666", display: "block", marginBottom: 6, fontWeight: 600 }}>Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="Masukkan password"
+              onKeyDown={e => e.key === "Enter" && handleLogin()}
+              style={{
+                width: "100%", background: "#f8f9fa",
+                border: "1px solid #e9ecef",
+                borderRadius: 10, padding: "12px 14px",
+                fontSize: 14, color: "#333", outline: "none",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+
+          {error && (
+            <div style={{
+              background: "#fdedec", border: "1px solid #f1948a",
+              borderRadius: 10, padding: "10px 14px",
+              fontSize: 12, color: "#e74c3c", marginBottom: 16,
+            }}>
+              ⚠ {error}
+            </div>
+          )}
+
+          <button
+            onClick={handleLogin}
+            disabled={loading}
+            style={{
+              width: "100%",
+              background: loading ? "#aaa" : "linear-gradient(135deg, #2980b9, #3498db)",
+              border: "none", borderRadius: 12,
+              padding: "14px", color: "#fff",
+              fontSize: 14, fontWeight: 700,
+              cursor: loading ? "not-allowed" : "pointer",
+              boxShadow: loading ? "none" : "0 4px 15px rgba(52,152,219,0.4)",
+              transition: "all 0.2s",
+            }}
+          >
+            {loading ? "Memverifikasi..." : "Masuk →"}
+          </button>
+        </div>
+
+        <div style={{ textAlign: "center", marginTop: 16 }}>
+          <a href="/" style={{ color: "rgba(255,255,255,0.7)", fontSize: 12, textDecoration: "none" }}>
+            ← Kembali ke halaman publik
+          </a>
+        </div>
       </div>
     </div>
   );

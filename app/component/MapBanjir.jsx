@@ -26,7 +26,8 @@ export default function MapBanjir({ locations }) {
         shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
       });
 
-      const map = L.map(mapRef.current).setView([-6.2088, 106.8456], 11);
+      if (mapRef.current._leaflet_id) return;
+const map = L.map(mapRef.current).setView([-6.3271, 108.3254], 14);
 
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: '© OpenStreetMap contributors',
@@ -76,7 +77,7 @@ export default function MapBanjir({ locations }) {
       />
       <div
         ref={mapRef}
-        style={{ width: "100%", height: 420, borderRadius: 10, overflow: "hidden" }}
+   style={{ width: "100%", height: 400, borderRadius: 10, overflow: "hidden", zIndex: 0 }}     
       />
     </>
   );

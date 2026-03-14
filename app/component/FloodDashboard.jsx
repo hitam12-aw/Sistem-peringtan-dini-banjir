@@ -1,112 +1,54 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import {
-  AreaChart, Area, BarChart, Bar,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
-} from "recharts";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 // ─── DATA DUMMY ───────────────────────────────────────────────────────────────
 const locations = [
-  { id: 1, name: "Sungai Ciliwung", lat: -6.2088, lng: 106.8456, level: 320, maxLevel: 350, status: "bahaya",  rain: 87 },
-  { id: 2, name: "Sungai Cisadane", lat: -6.2500, lng: 106.7000, level: 210, maxLevel: 300, status: "waspada", rain: 54 },
-  { id: 3, name: "Kali Angke",      lat: -6.1800, lng: 106.7200, level: 95,  maxLevel: 250, status: "aman",    rain: 22 },
-  { id: 4, name: "Sungai Bekasi",   lat: -6.2349, lng: 107.0000, level: 180, maxLevel: 280, status: "waspada", rain: 61 },
-  { id: 5, name: "Kali Sunter",     lat: -6.1900, lng: 106.8700, level: 290, maxLevel: 310, status: "bahaya",  rain: 92 },
-];
-
-const rainfallHistory = [
-  { time: "00:00", Ciliwung: 45, Cisadane: 30, Angke: 10 },
-  { time: "02:00", Ciliwung: 55, Cisadane: 35, Angke: 12 },
-  { time: "04:00", Ciliwung: 70, Cisadane: 42, Angke: 18 },
-  { time: "06:00", Ciliwung: 80, Cisadane: 50, Angke: 20 },
-  { time: "08:00", Ciliwung: 87, Cisadane: 54, Angke: 22 },
-  { time: "10:00", Ciliwung: 92, Cisadane: 60, Angke: 19 },
-  { time: "12:00", Ciliwung: 78, Cisadane: 48, Angke: 15 },
+  { id: 1, name: "Kali Rambatan",         lat: -6.3312, lng: 108.3198, level: 250, maxLevel: 280, status: "bahaya",  rain: 85 },
+  { id: 2, name: "Sungai Cimanuk",        lat: -6.3271, lng: 108.3254, level: 180, maxLevel: 300, status: "waspada", rain: 60 },
+  { id: 3, name: "Saluran Irigasi Utara", lat: -6.3210, lng: 108.3300, level: 90,  maxLevel: 200, status: "aman",    rain: 20 },
+  { id: 4, name: "Saluran Irigasi Timur", lat: -6.3350, lng: 108.3350, level: 160, maxLevel: 250, status: "waspada", rain: 45 },
 ];
 
 const waterLevelHistory = [
-  { time: "00:00", level: 200, batas: 350 },
-  { time: "02:00", level: 230, batas: 350 },
-  { time: "04:00", level: 265, batas: 350 },
-  { time: "06:00", level: 290, batas: 350 },
-  { time: "08:00", level: 310, batas: 350 },
-  { time: "10:00", level: 320, batas: 350 },
-  { time: "12:00", level: 318, batas: 350 },
+  { time: "00:00", level: 120 },
+  { time: "02:00", level: 145 },
+  { time: "04:00", level: 175 },
+  { time: "06:00", level: 200 },
+  { time: "08:00", level: 230 },
+  { time: "10:00", level: 250 },
+  { time: "12:00", level: 245 },
 ];
 
 const alertsData = [
-  { id: 1, time: "12:45", loc: "Sungai Ciliwung", msg: "Ketinggian air mendekati batas kritis 350cm", level: "bahaya" },
-  { id: 2, time: "11:30", loc: "Kali Sunter",     msg: "Curah hujan ekstrem 92mm/jam terdeteksi",    level: "bahaya" },
-  { id: 3, time: "10:15", loc: "Sungai Bekasi",   msg: "Ketinggian air naik 30cm dalam 2 jam",       level: "waspada" },
-  { id: 4, time: "09:00", loc: "Sungai Cisadane", msg: "Status meningkat ke level waspada",           level: "waspada" },
-  { id: 5, time: "07:30", loc: "Kali Angke",      msg: "Pemantauan normal, tidak ada anomali",        level: "aman" },
+  { id: 1, time: "12:45", loc: "Kali Rambatan",         msg: "Ketinggian air mendekati batas kritis 280cm", level: "bahaya" },
+  { id: 2, time: "11:30", loc: "Sungai Cimanuk",        msg: "Curah hujan meningkat 85mm/jam terdeteksi",   level: "waspada" },
+  { id: 3, time: "10:15", loc: "Saluran Irigasi Timur", msg: "Ketinggian air naik 20cm dalam 2 jam",        level: "waspada" },
+  { id: 4, time: "09:00", loc: "Saluran Irigasi Utara", msg: "Pemantauan normal, tidak ada anomali",        level: "aman" },
 ];
 
+const poskos = [
+  { nama: "Posko SDN Rambatan Kulon", jarak: "0.5 km", alamat: "Desa Rambatan Kulon, Indramayu", lat: -6.3290, lng: 108.3240 },
+  { nama: "Posko Balai Desa",         jarak: "1.2 km", alamat: "Jl. Desa Rambatan Kulon No.1",   lat: -6.3271, lng: 108.3254 },
+  { nama: "Posko Masjid Al-Hidayah",  jarak: "1.8 km", alamat: "Desa Rambatan Kulon, Indramayu", lat: -6.3310, lng: 108.3280 },
+];
+
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const STATUS = {
-  aman:    { color: "#00e5a0", bg: "rgba(0,229,160,0.08)",  border: "rgba(0,229,160,0.25)",  label: "AMAN",    icon: "●" },
-  waspada: { color: "#ffb830", bg: "rgba(255,184,48,0.08)", border: "rgba(255,184,48,0.25)", label: "WASPADA", icon: "▲" },
-  bahaya:  { color: "#ff3d5a", bg: "rgba(255,61,90,0.08)",  border: "rgba(255,61,90,0.25)",  label: "BAHAYA",  icon: "■" },
+  aman:    { color: "#27ae60", bg: "#eafaf1", border: "#a9dfbf", label: "AMAN",   icon: "✓", bgCard: "#27ae60" },
+  waspada: { color: "#e67e22", bg: "#fef9e7", border: "#f9e79f", label: "SIAGA",  icon: "!", bgCard: "#e67e22" },
+  bahaya:  { color: "#e74c3c", bg: "#fdedec", border: "#f1948a", label: "BAHAYA", icon: "⚠", bgCard: "#e74c3c" },
 };
 
-const NAV_ITEMS = [
-  { key: "dashboard",  label: "Dashboard",  icon: "⬡" },
-  { key: "peta",       label: "Peta",       icon: "◈" },
-  { key: "grafik",     label: "Grafik",     icon: "◫" },
-  { key: "peringatan", label: "Peringatan", icon: "◬" },
-];
-
-// ─── BADGE ────────────────────────────────────────────────────────────────────
-function Badge({ status }) {
-  const s = STATUS[status];
-  return (
-    <span style={{
-      background: s.bg, color: s.color,
-      border: `1px solid ${s.border}`,
-      borderRadius: 3, padding: "2px 8px",
-      fontSize: 10, fontWeight: 700, letterSpacing: 2,
-      fontFamily: "monospace", whiteSpace: "nowrap",
-    }}>
-      {s.icon} {s.label}
-    </span>
-  );
-}
-
-function Card({ children, style = {} }) {
-  return (
-    <div style={{
-      background: "rgba(255,255,255,0.025)",
-      border: "1px solid rgba(255,255,255,0.07)",
-      borderRadius: 10, padding: 18,
-      ...style,
-    }}>
-      {children}
-    </div>
-  );
-}
-
-function SectionTitle({ children }) {
-  return (
-    <div style={{
-      fontFamily: "monospace", fontSize: 10,
-      letterSpacing: 3, color: "#555",
-      textTransform: "uppercase", marginBottom: 14,
-    }}>
-      ▸ {children}
-    </div>
-  );
-}
-
-// ─── MAP VIEW (LEAFLET) ───────────────────────────────────────────────────────
-function MapView({ selected, onSelect }) {
+// ─── MAP COMPONENT ────────────────────────────────────────────────────────────
+function PetaView() {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
-  const markersRef = useRef([]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (mapInstanceRef.current) return;
-
     import("leaflet").then((L) => {
       delete L.Icon.Default.prototype._getIconUrl;
       L.Icon.Default.mergeOptions({
@@ -114,541 +56,516 @@ function MapView({ selected, onSelect }) {
         iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
         shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
       });
-
-      const map = L.map(mapRef.current).setView([-6.2088, 106.8456], 11);
+      if (mapRef.current._leaflet_id) return;
+      const map = L.map(mapRef.current).setView([-6.3271, 108.3254], 14);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: '© OpenStreetMap contributors',
+        attribution: "© OpenStreetMap contributors",
       }).addTo(map);
 
       locations.forEach((loc) => {
         const s = STATUS[loc.status];
         const circle = L.circleMarker([loc.lat, loc.lng], {
-          radius: 14,
-          fillColor: s.color,
-          color: s.color,
-          weight: 2,
-          opacity: 0.9,
-          fillOpacity: 0.35,
+          radius: 14, fillColor: s.bgCard, color: s.bgCard,
+          weight: 2, opacity: 0.9, fillOpacity: 0.5,
         }).addTo(map);
-
         circle.bindPopup(`
-          <div style="font-family:monospace;min-width:180px">
-            <div style="font-weight:900;font-size:13px;margin-bottom:6px">${loc.name}</div>
-            <div style="color:${s.color};font-weight:700;margin-bottom:8px">● ${s.label}</div>
-            <div style="font-size:11px;color:#555;margin-bottom:2px">Ketinggian Air: <b>${loc.level} cm</b></div>
-            <div style="font-size:11px;color:#555;margin-bottom:2px">Batas Kritis: <b>${loc.maxLevel} cm</b></div>
-            <div style="font-size:11px;color:#555">Curah Hujan: <b>${loc.rain} mm/jam</b></div>
+          <div style="font-family:sans-serif;min-width:160px;padding:4px">
+            <b style="font-size:13px">${loc.name}</b><br/>
+            <span style="color:${s.bgCard};font-weight:700">${s.label}</span><br/>
+            <span style="font-size:12px;color:#555">Tinggi Air: <b>${loc.level} cm</b></span>
           </div>
         `);
+      });
 
-        circle.on("click", () => onSelect(loc));
-        markersRef.current.push(circle);
+      poskos.forEach((p) => {
+        const marker = L.marker([p.lat, p.lng]).addTo(map);
+        marker.bindPopup(`
+          <div style="font-family:sans-serif;min-width:160px;padding:4px">
+            <b style="font-size:13px">🏥 ${p.nama}</b><br/>
+            <span style="font-size:12px;color:#555">${p.alamat}</span><br/>
+            <span style="font-size:12px;color:#3498db;font-weight:700">${p.jarak}</span>
+          </div>
+        `);
       });
 
       mapInstanceRef.current = map;
     });
-
     return () => {
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
-      }
+      if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; }
     };
   }, []);
 
   return (
     <>
       <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-      <div ref={mapRef} style={{ width: "100%", height: 400, borderRadius: 10, overflow: "hidden" }} />
+      {/* margin negatif biar peta full width di dalam card */}
+      <div style={{ margin: "0 -16px" }}>
+        <div ref={mapRef} style={{ width: "100%", height: 300, zIndex: 0 }} />
+      </div>
     </>
   );
 }
 
-// ─── PAGE: DASHBOARD ─────────────────────────────────────────────────────────
-function PageDashboard({ selected, setSelected, time }) {
+// ─── PAGE: HOME ───────────────────────────────────────────────────────────────
+function PageHome({ time, selectedLoc, setSelectedLoc, setPage }) {
   const danger  = locations.filter(l => l.status === "bahaya").length;
   const waspada = locations.filter(l => l.status === "waspada").length;
   const overall = danger > 0 ? "bahaya" : waspada > 0 ? "waspada" : "aman";
   const os = STATUS[overall];
+  const loc = selectedLoc || locations[0];
+  const ls = STATUS[loc.status];
+  const pct = Math.round((loc.level / loc.maxLevel) * 100);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {/* Banner */}
+      {/* Status Banner */}
       <div style={{
-        background: os.bg, border: `1px solid ${os.border}`,
-        borderRadius: 10, padding: "18px 20px",
-        display: "flex", justifyContent: "space-between",
-        alignItems: "center", flexWrap: "wrap", gap: 12,
+        background: os.bgCard, borderRadius: 20,
+        padding: "20px 20px 16px", color: "#fff",
+        boxShadow: `0 4px 20px ${os.bgCard}55`,
       }}>
-        <div>
-          <div style={{ fontFamily: "monospace", fontSize: 10, color: "#555", letterSpacing: 3, marginBottom: 6 }}>STATUS KESELURUHAN SISTEM</div>
-          <div style={{ fontSize: 28, fontWeight: 900, color: os.color, fontFamily: "monospace", letterSpacing: 3 }}>
-            {os.icon} {os.label}
-          </div>
-          <div style={{ fontSize: 11, color: "#555", marginTop: 6, fontFamily: "monospace" }}>
-            {danger} Bahaya · {waspada} Waspada · {locations.length - danger - waspada} Aman
-          </div>
+        <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 4 }}>Status Banjir — Rambatan Kulon</div>
+        <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: 1, marginBottom: 4 }}>
+          {os.icon} {os.label}
         </div>
-        <div style={{ textAlign: "right" }}>
-          <div suppressHydrationWarning style={{ fontFamily: "monospace", fontSize: 20, color: "#ccc" }}>
-            {time.toLocaleTimeString("id-ID")}
-          </div>
-          <div suppressHydrationWarning style={{ fontFamily: "monospace", fontSize: 10, color: "#444", marginTop: 4 }}>
-            {time.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-          </div>
+        <div style={{ fontSize: 13, opacity: 0.9, marginBottom: 12 }}>
+          Tinggi Air: <b>{loc.level} cm</b> &nbsp;·&nbsp; Update: <span suppressHydrationWarning>{time.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</span>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+          {[
+            { label: "Peta Evakuasi", icon: "🗺️", page: "peta" },
+            { label: "Info Posko",    icon: "🏥", page: "posko" },
+            { label: "Notifikasi",    icon: "🔔", page: "notifikasi" },
+          ].map((m) => (
+            <button key={m.page} onClick={() => setPage(m.page)} style={{
+              background: "rgba(255,255,255,0.2)",
+              border: "1px solid rgba(255,255,255,0.3)",
+              borderRadius: 12, padding: "10px 6px",
+              color: "#fff", cursor: "pointer",
+              display: "flex", flexDirection: "column",
+              alignItems: "center", gap: 4,
+              fontSize: 11, fontWeight: 600,
+            }}>
+              <span style={{ fontSize: 20 }}>{m.icon}</span>
+              {m.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Stat Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12 }}>
-        {[
-          { label: "Titik Pantau",    value: locations.length, unit: "lokasi", color: "#00e5a0", sub: "Semua aktif" },
-          { label: "Level Tertinggi", value: 320,              unit: "cm",     color: "#ff3d5a", sub: "Ciliwung" },
-          { label: "Curah Hujan Max", value: 92,               unit: "mm/jam", color: "#ff3d5a", sub: "Kali Sunter" },
-          { label: "Zona Bahaya",     value: danger,           unit: "titik",  color: "#ff3d5a", sub: "Perlu evakuasi" },
-        ].map((s, i) => (
-          <Card key={i} style={{ borderLeft: `3px solid ${s.color}` }}>
-            <div style={{ fontFamily: "monospace", fontSize: 10, color: "#555", letterSpacing: 2, marginBottom: 8 }}>{s.label}</div>
-            <div style={{ fontFamily: "monospace", fontSize: 28, fontWeight: 900, color: s.color, lineHeight: 1 }}>
-              {s.value}
-              <span style={{ fontSize: 12, color: "#666", marginLeft: 4 }}>{s.unit}</span>
-            </div>
-            <div style={{ fontFamily: "monospace", fontSize: 10, color: "#444", marginTop: 6 }}>{s.sub}</div>
-          </Card>
-        ))}
-      </div>
-
-      {/* Lokasi List */}
-      <Card>
-        <SectionTitle>Status Semua Lokasi</SectionTitle>
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {locations.map(loc => {
-            const pct = Math.round((loc.level / loc.maxLevel) * 100);
-            const s = STATUS[loc.status];
-            const isSel = selected?.id === loc.id;
+      {/* Pilih Lokasi */}
+      <div style={{ background: "#fff", borderRadius: 16, padding: 16, boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#333", marginBottom: 10 }}>📍 Pilih Lokasi</div>
+        <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+          {locations.map(l => {
+            const s = STATUS[l.status];
+            const isActive = selectedLoc?.id === l.id;
             return (
-              <div key={loc.id} onClick={() => setSelected(loc)} style={{
-                background: isSel ? s.bg : "rgba(255,255,255,0.02)",
-                border: `1px solid ${isSel ? s.border : "rgba(255,255,255,0.05)"}`,
-                borderRadius: 8, padding: "12px 14px", cursor: "pointer",
-                transition: "all 0.2s",
+              <button key={l.id} onClick={() => setSelectedLoc(l)} style={{
+                background: isActive ? s.bgCard : "#f5f6fa",
+                color: isActive ? "#fff" : "#555",
+                border: "none", borderRadius: 20,
+                padding: "6px 14px", fontSize: 12,
+                fontWeight: isActive ? 700 : 400,
+                cursor: "pointer", whiteSpace: "nowrap",
+                flexShrink: 0, transition: "all 0.2s",
               }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
-                  <div style={{ fontFamily: "monospace", fontSize: 13, color: "#ddd", fontWeight: 700 }}>{loc.name}</div>
-                  <Badge status={loc.status} />
+                {l.name.replace("Sungai ", "").replace("Kali ", "").replace("Saluran ", "")}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Detail Status Air */}
+      <div style={{ background: "#fff", borderRadius: 16, padding: 16, boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#333" }}>📊 Detail Status Air</div>
+          <span style={{
+            background: ls.bg, color: ls.color,
+            border: `1px solid ${ls.border}`,
+            borderRadius: 20, padding: "2px 10px",
+            fontSize: 11, fontWeight: 700,
+          }}>{ls.label}</span>
+        </div>
+        <ResponsiveContainer width="100%" height={120}>
+          <AreaChart data={waterLevelHistory} margin={{ top: 5, right: 5, left: -30, bottom: 0 }}>
+            <defs>
+              <linearGradient id="lvl" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={ls.bgCard} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={ls.bgCard} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <XAxis dataKey="time" tick={{ fill: "#aaa", fontSize: 9 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: "#aaa", fontSize: 9 }} axisLine={false} tickLine={false} />
+            <Tooltip contentStyle={{ borderRadius: 8, fontSize: 11, border: "none", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }} />
+            <Area type="monotone" dataKey="level" stroke={ls.bgCard} strokeWidth={2} fill="url(#lvl)" dot={false} name="Tinggi Air (cm)" />
+          </AreaChart>
+        </ResponsiveContainer>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 12 }}>
+          {[
+            { label: "Tinggi Air",  value: `${loc.level} cm` },
+            { label: "Status",      value: ls.label },
+            { label: "Curah Hujan", value: `${loc.rain} mm/j` },
+          ].map((s, i) => (
+            <div key={i} style={{ background: "#f8f9fa", borderRadius: 10, padding: "8px 10px" }}>
+              <div style={{ fontSize: 10, color: "#aaa", marginBottom: 2 }}>{s.label}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#333" }}>{s.value}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#aaa", marginBottom: 4 }}>
+            <span>Kapasitas</span>
+            <span>{pct}% dari batas kritis</span>
+          </div>
+          <div style={{ background: "#f0f0f0", borderRadius: 8, height: 8, overflow: "hidden" }}>
+            <div style={{ width: `${pct}%`, height: "100%", background: ls.bgCard, borderRadius: 8, transition: "width 0.5s" }} />
+          </div>
+        </div>
+      </div>
+
+      {/* Semua Lokasi */}
+      <div style={{ background: "#fff", borderRadius: 16, padding: 16, boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#333", marginBottom: 12 }}>🌊 Semua Lokasi</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {locations.map(l => {
+            const s = STATUS[l.status];
+            return (
+              <div key={l.id} onClick={() => setSelectedLoc(l)} style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                background: "#f8f9fa", borderRadius: 12, padding: "10px 14px", cursor: "pointer",
+                border: `1px solid ${selectedLoc?.id === l.id ? s.border : "transparent"}`,
+              }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#333" }}>{l.name}</div>
+                  <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>Tinggi: {l.level} cm · Hujan: {l.rain} mm/jam</div>
                 </div>
-                <div style={{ display: "flex", gap: 16, marginBottom: 8, flexWrap: "wrap" }}>
-                  <span style={{ fontFamily: "monospace", fontSize: 11, color: "#666" }}>Ketinggian: <span style={{ color: s.color }}>{loc.level} cm</span></span>
-                  <span style={{ fontFamily: "monospace", fontSize: 11, color: "#666" }}>Hujan: <span style={{ color: "#aaa" }}>{loc.rain} mm/jam</span></span>
-                </div>
-                <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 4, height: 4, overflow: "hidden" }}>
-                  <div style={{ width: `${pct}%`, height: "100%", background: s.color, borderRadius: 4, transition: "width 0.5s" }} />
-                </div>
-                <div style={{ fontFamily: "monospace", fontSize: 9, color: "#444", marginTop: 4 }}>{pct}% dari batas kritis</div>
+                <span style={{ background: s.bgCard, color: "#fff", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 700 }}>
+                  {s.label}
+                </span>
               </div>
             );
           })}
         </div>
-      </Card>
-
-      {/* Alert terbaru */}
-      <Card>
-        <SectionTitle>Peringatan Terbaru</SectionTitle>
-        {alertsData.slice(0, 3).map(a => {
-          const s = STATUS[a.level];
-          return (
-            <div key={a.id} style={{
-              borderLeft: `3px solid ${s.color}`,
-              background: s.bg, borderRadius: "0 6px 6px 0",
-              padding: "10px 14px", marginBottom: 8,
-            }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 4 }}>
-                <div style={{ fontFamily: "monospace", fontSize: 11, color: s.color, fontWeight: 700 }}>{a.loc}</div>
-                <div style={{ fontFamily: "monospace", fontSize: 10, color: "#555" }}>{a.time} WIB</div>
-              </div>
-              <div style={{ fontFamily: "monospace", fontSize: 11, color: "#888", marginTop: 4 }}>{a.msg}</div>
-            </div>
-          );
-        })}
-      </Card>
+      </div>
     </div>
   );
 }
 
 // ─── PAGE: PETA ───────────────────────────────────────────────────────────────
-function PagePeta({ selected, setSelected }) {
+function PagePeta() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <Card>
-        <SectionTitle>Peta Lokasi Rawan Banjir — Jabodetabek</SectionTitle>
-        <MapView selected={selected} onSelect={setSelected} />
-        <div style={{ display: "flex", gap: 14, marginTop: 12, flexWrap: "wrap" }}>
+      {/* Card peta full width tanpa padding samping */}
+      <div style={{ background: "#fff", borderRadius: 16, overflow: "hidden", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+        <div style={{ padding: "16px 16px 12px" }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#333", marginBottom: 2 }}>🗺️ Peta Evakuasi</div>
+          <div style={{ fontSize: 11, color: "#aaa" }}>Desa Rambatan Kulon, Kec. Kandanghaur, Indramayu</div>
+        </div>
+        {/* Peta langsung tanpa padding */}
+        <div style={{ width: "100%", height: 300, zIndex: 0, position: "relative" }}>
+          <PetaViewFull />
+        </div>
+        {/* Legend */}
+        <div style={{ padding: "12px 16px", display: "flex", gap: 16, flexWrap: "wrap" }}>
           {Object.entries(STATUS).map(([k, v]) => (
             <div key={k} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <div style={{ width: 10, height: 10, borderRadius: "50%", background: v.color, opacity: 0.8 }} />
-              <span style={{ fontFamily: "monospace", fontSize: 10, color: "#666" }}>{v.label}</span>
+              <div style={{ width: 10, height: 10, borderRadius: "50%", background: v.bgCard }} />
+              <span style={{ fontSize: 11, color: "#666" }}>{v.label}</span>
             </div>
           ))}
-        </div>
-      </Card>
-      {selected ? (
-        <Card style={{ borderLeft: `3px solid ${STATUS[selected.status].color}` }}>
-          <SectionTitle>Detail Lokasi Terpilih</SectionTitle>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
-            <div>
-              <div style={{ fontFamily: "monospace", fontSize: 18, fontWeight: 900, color: "#ddd", marginBottom: 8 }}>{selected.name}</div>
-              <Badge status={selected.status} />
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              {[
-                { label: "Ketinggian Air", value: `${selected.level} cm` },
-                { label: "Batas Kritis",   value: `${selected.maxLevel} cm` },
-                { label: "Curah Hujan",    value: `${selected.rain} mm/jam` },
-                { label: "Kapasitas",      value: `${Math.round((selected.level / selected.maxLevel) * 100)}%` },
-              ].map((d, i) => (
-                <div key={i} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 6, padding: "8px 12px" }}>
-                  <div style={{ fontFamily: "monospace", fontSize: 9, color: "#555", letterSpacing: 2 }}>{d.label}</div>
-                  <div style={{ fontFamily: "monospace", fontSize: 16, color: STATUS[selected.status].color, fontWeight: 700, marginTop: 2 }}>{d.value}</div>
-                </div>
-              ))}
-            </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 14 }}>📍</span>
+            <span style={{ fontSize: 11, color: "#666" }}>Posko</span>
           </div>
-        </Card>
-      ) : (
-        <div style={{ textAlign: "center", fontFamily: "monospace", color: "#444", fontSize: 12, padding: 20 }}>
-          Klik titik pada peta untuk melihat detail lokasi
         </div>
-      )}
+      </div>
+
+      <div style={{ background: "#fff", borderRadius: 16, padding: 16, boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#333", marginBottom: 12 }}>📌 Titik Pemantauan</div>
+        {locations.map((l, i) => {
+          const s = STATUS[l.status];
+          return (
+            <div key={l.id} style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              padding: "10px 0", borderBottom: i < locations.length - 1 ? "1px solid #f0f0f0" : "none",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 36, height: 36, borderRadius: "50%", background: s.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ fontSize: 16 }}>📍</span>
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#333" }}>{l.name}</div>
+                  <div style={{ fontSize: 11, color: "#aaa" }}>{l.level} cm · {l.rain} mm/jam</div>
+                </div>
+              </div>
+              <span style={{ background: s.bgCard, color: "#fff", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 700 }}>
+                {s.label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-// ─── PAGE: GRAFIK ─────────────────────────────────────────────────────────────
-const TOOLTIP_STYLE = {
-  background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.1)",
-  borderRadius: 6, fontFamily: "monospace", fontSize: 11,
-};
+// Versi PetaView untuk PagePeta (tanpa margin negatif, langsung full)
+function PetaViewFull() {
+  const mapRef = useRef(null);
+  const mapInstanceRef = useRef(null);
 
-function PageGrafik() {
-  const [tab, setTab] = useState("curah");
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (mapInstanceRef.current) return;
+    import("leaflet").then((L) => {
+      delete L.Icon.Default.prototype._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+        iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+        shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+      });
+      if (mapRef.current._leaflet_id) return;
+      const map = L.map(mapRef.current).setView([-6.3271, 108.3254], 14);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "© OpenStreetMap contributors",
+      }).addTo(map);
+      locations.forEach((loc) => {
+        const s = STATUS[loc.status];
+        const circle = L.circleMarker([loc.lat, loc.lng], {
+          radius: 14, fillColor: s.bgCard, color: s.bgCard,
+          weight: 2, opacity: 0.9, fillOpacity: 0.5,
+        }).addTo(map);
+        circle.bindPopup(`
+          <div style="font-family:sans-serif;min-width:160px;padding:4px">
+            <b style="font-size:13px">${loc.name}</b><br/>
+            <span style="color:${s.bgCard};font-weight:700">${s.label}</span><br/>
+            <span style="font-size:12px;color:#555">Tinggi Air: <b>${loc.level} cm</b></span>
+          </div>
+        `);
+      });
+      poskos.forEach((p) => {
+        const marker = L.marker([p.lat, p.lng]).addTo(map);
+        marker.bindPopup(`
+          <div style="font-family:sans-serif;min-width:160px;padding:4px">
+            <b style="font-size:13px">🏥 ${p.nama}</b><br/>
+            <span style="font-size:12px;color:#555">${p.alamat}</span><br/>
+            <span style="font-size:12px;color:#3498db;font-weight:700">${p.jarak}</span>
+          </div>
+        `);
+      });
+      mapInstanceRef.current = map;
+    });
+    return () => {
+      if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; }
+    };
+  }, []);
+
+  return (
+    <>
+      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+      <div ref={mapRef} style={{ width: "100%", height: "100%", zIndex: 0 }} />
+    </>
+  );
+}
+
+// ─── PAGE: POSKO ─────────────────────────────────────────────────────────────
+function PagePosko() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{ display: "flex", gap: 8 }}>
-        {[{ key: "curah", label: "Curah Hujan" }, { key: "ketinggian", label: "Ketinggian Air" }].map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)} style={{
-            background: tab === t.key ? "rgba(0,229,160,0.12)" : "rgba(255,255,255,0.03)",
-            border: `1px solid ${tab === t.key ? "rgba(0,229,160,0.4)" : "rgba(255,255,255,0.07)"}`,
-            color: tab === t.key ? "#00e5a0" : "#666",
-            borderRadius: 6, padding: "8px 16px",
-            fontFamily: "monospace", fontSize: 11, cursor: "pointer",
-            letterSpacing: 1, transition: "all 0.2s",
+      <div style={{ background: "#fff", borderRadius: 16, padding: 16, boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#333", marginBottom: 4 }}>🏥 Info Posko Pengungsian</div>
+        <div style={{ fontSize: 11, color: "#aaa", marginBottom: 12 }}>Desa Rambatan Kulon, Indramayu</div>
+        {poskos.map((p, i) => (
+          <div key={i} style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            padding: "12px 0", borderBottom: i < poskos.length - 1 ? "1px solid #f0f0f0" : "none",
           }}>
-            {t.label}
-          </button>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#e8f4fd", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
+                🏥
+              </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#333" }}>{p.nama}</div>
+                <div style={{ fontSize: 11, color: "#aaa", marginTop: 2 }}>{p.alamat}</div>
+              </div>
+            </div>
+            <div style={{ textAlign: "right", flexShrink: 0 }}>
+              <div style={{ fontSize: 12, color: "#3498db", fontWeight: 700, marginBottom: 4 }}>{p.jarak}</div>
+              <button
+                onClick={() => window.open(`https://www.google.com/maps?q=${p.lat},${p.lng}`, "_blank")}
+                style={{
+                  background: "#3498db", color: "#fff", border: "none",
+                  borderRadius: 8, padding: "5px 12px", fontSize: 11,
+                  cursor: "pointer", fontWeight: 600,
+                  display: "flex", alignItems: "center", gap: 4,
+                }}
+              >
+                🗺️ Lihat Peta
+              </button>
+            </div>
+          </div>
         ))}
       </div>
-
-      {tab === "curah" && (
-        <Card>
-          <SectionTitle>Curah Hujan per Lokasi (mm/jam)</SectionTitle>
-          <ResponsiveContainer width="100%" height={240}>
-            <AreaChart data={rainfallHistory} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-              <defs>
-                {[["Ciliwung","#ff3d5a"],["Cisadane","#ffb830"],["Angke","#00e5a0"]].map(([n,c]) => (
-                  <linearGradient key={n} id={`g${n}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={c} stopOpacity={0.3} />
-                    <stop offset="95%" stopColor={c} stopOpacity={0} />
-                  </linearGradient>
-                ))}
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-              <XAxis dataKey="time" tick={{ fill: "#555", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: "#555", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={TOOLTIP_STYLE} />
-              {[["Ciliwung","#ff3d5a"],["Cisadane","#ffb830"],["Angke","#00e5a0"]].map(([n,c]) => (
-                <Area key={n} type="monotone" dataKey={n} stroke={c} strokeWidth={2} fill={`url(#g${n})`} dot={false} />
-              ))}
-            </AreaChart>
-          </ResponsiveContainer>
-          <div style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
-            {[["Ciliwung","#ff3d5a"],["Cisadane","#ffb830"],["Angke","#00e5a0"]].map(([n,c]) => (
-              <div key={n} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <div style={{ width: 24, height: 2, background: c, borderRadius: 2 }} />
-                <span style={{ fontFamily: "monospace", fontSize: 10, color: "#666" }}>{n}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-
-      {tab === "ketinggian" && (
-        <Card>
-          <SectionTitle>Ketinggian Air Ciliwung (cm)</SectionTitle>
-          <ResponsiveContainer width="100%" height={240}>
-            <AreaChart data={waterLevelHistory} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-              <defs>
-                <linearGradient id="glevel" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#ff3d5a" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="#ff3d5a" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-              <XAxis dataKey="time" tick={{ fill: "#555", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: "#555", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={TOOLTIP_STYLE} />
-              <Area type="monotone" dataKey="level" stroke="#ff3d5a" strokeWidth={2} fill="url(#glevel)" dot={false} name="Ketinggian" />
-              <Area type="monotone" dataKey="batas" stroke="rgba(255,184,48,0.5)" strokeWidth={1} strokeDasharray="5 5" fill="none" dot={false} name="Batas Kritis" />
-            </AreaChart>
-          </ResponsiveContainer>
-          <div style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <div style={{ width: 24, height: 2, background: "#ff3d5a", borderRadius: 2 }} />
-              <span style={{ fontFamily: "monospace", fontSize: 10, color: "#666" }}>Ketinggian</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <div style={{ width: 24, height: 2, background: "#ffb830", borderRadius: 2, opacity: 0.6 }} />
-              <span style={{ fontFamily: "monospace", fontSize: 10, color: "#666" }}>Batas Kritis</span>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      <Card>
-        <SectionTitle>Curah Hujan Saat Ini per Lokasi</SectionTitle>
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart
-            data={locations.map(l => ({ name: l.name.replace("Sungai ","").replace("Kali ",""), rain: l.rain }))}
-            margin={{ top: 5, right: 5, left: -20, bottom: 0 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-            <XAxis dataKey="name" tick={{ fill: "#555", fontSize: 9, fontFamily: "monospace" }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: "#555", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} />
-            <Tooltip contentStyle={TOOLTIP_STYLE} />
-            <Bar dataKey="rain" name="Curah Hujan (mm/jam)" radius={[4,4,0,0]} fill="#00e5a0" />
-          </BarChart>
-        </ResponsiveContainer>
-      </Card>
     </div>
   );
 }
 
-// ─── PAGE: PERINGATAN ────────────────────────────────────────────────────────
-function PagePeringatan() {
+// ─── PAGE: NOTIFIKASI ─────────────────────────────────────────────────────────
+function PageNotifikasi() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 12 }}>
-        {[
-          { label: "Total",   value: alertsData.length, color: "#aaa" },
-          { label: "Bahaya",  value: alertsData.filter(a => a.level === "bahaya").length,  color: "#ff3d5a" },
-          { label: "Waspada", value: alertsData.filter(a => a.level === "waspada").length, color: "#ffb830" },
-          { label: "Aman",    value: alertsData.filter(a => a.level === "aman").length,    color: "#00e5a0" },
-        ].map((s, i) => (
-          <Card key={i} style={{ textAlign: "center" }}>
-            <div style={{ fontFamily: "monospace", fontSize: 32, fontWeight: 900, color: s.color }}>{s.value}</div>
-            <div style={{ fontFamily: "monospace", fontSize: 10, color: "#555", letterSpacing: 2, marginTop: 4 }}>{s.label}</div>
-          </Card>
-        ))}
-      </div>
-
-      <Card>
-        <SectionTitle>Riwayat Peringatan Hari Ini</SectionTitle>
+      <div style={{ background: "#fff", borderRadius: 16, padding: 16, boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#333", marginBottom: 12 }}>🔔 Notifikasi Peringatan</div>
         {alertsData.map(a => {
           const s = STATUS[a.level];
           return (
             <div key={a.id} style={{
-              borderLeft: `3px solid ${s.color}`,
-              background: s.bg, borderRadius: "0 8px 8px 0",
-              padding: "14px 16px", marginBottom: 10,
+              background: s.bg, border: `1px solid ${s.border}`,
+              borderRadius: 12, padding: "12px 14px", marginBottom: 8,
+              display: "flex", gap: 12, alignItems: "flex-start",
             }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 6 }}>
-                <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                  <Badge status={a.level} />
-                  <span style={{ fontFamily: "monospace", fontSize: 12, color: "#ccc", fontWeight: 700 }}>{a.loc}</span>
-                </div>
-                <span style={{ fontFamily: "monospace", fontSize: 10, color: "#555" }}>{a.time} WIB</span>
+              <div style={{
+                width: 36, height: 36, borderRadius: "50%",
+                background: s.bgCard, color: "#fff",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 16, flexShrink: 0,
+              }}>
+                {a.level === "bahaya" ? "⚠" : a.level === "waspada" ? "!" : "✓"}
               </div>
-              <div style={{ fontFamily: "monospace", fontSize: 12, color: "#888" }}>{a.msg}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: s.color }}>Status {s.label}</div>
+                  <div style={{ fontSize: 11, color: "#aaa" }}>{a.time} WIB</div>
+                </div>
+                <div style={{ fontSize: 12, color: "#555", marginBottom: 2, fontWeight: 600 }}>{a.loc}</div>
+                <div style={{ fontSize: 11, color: "#777" }}>{a.msg}</div>
+              </div>
             </div>
           );
         })}
-      </Card>
+      </div>
     </div>
   );
 }
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function App() {
-  const [page, setPage] = useState("dashboard");
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [selected, setSelected] = useState(null);
+  const [page, setPage] = useState("home");
+  const [selectedLoc, setSelectedLoc] = useState(locations[0]);
   const [time, setTime] = useState(new Date());
-  const menuRef = useRef(null);
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
 
-  useEffect(() => {
-    function handler(e) {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
-    }
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  function navigate(key) {
-    setPage(key);
-    setMenuOpen(false);
-  }
-
   const danger  = locations.filter(l => l.status === "bahaya").length;
   const waspada = locations.filter(l => l.status === "waspada").length;
   const overall = danger > 0 ? "bahaya" : waspada > 0 ? "waspada" : "aman";
 
+  const pageTitle = {
+    home:       "Status Banjir",
+    peta:       "Peta Evakuasi",
+    posko:      "Info Posko",
+    notifikasi: "Notifikasi",
+  };
+
   return (
-    <div style={{ minHeight: "100vh", background: "#080c12", color: "#ccc" }}>
+    <div style={{ minHeight: "100vh", background: "#f0f4f8", fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
 
-      {/* ── NAVBAR ── */}
-      <nav style={{
+      {/* ── HEADER ── */}
+      <div style={{
+        background: "#fff", boxShadow: "0 2px 10px rgba(0,0,0,0.06)",
         position: "sticky", top: 0, zIndex: 100,
-        background: "rgba(8,12,18,0.96)",
-        backdropFilter: "blur(12px)",
-        borderBottom: "1px solid rgba(255,255,255,0.06)",
-        padding: "0 16px",
+        padding: "0 16px", height: 56,
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        height: 58, gap: 12,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: 8,
-            background: STATUS[overall].bg,
-            border: `1px solid ${STATUS[overall].border}`,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 16,
-          }}>💧</div>
-          <div>
-            <div style={{ fontFamily: "monospace", fontWeight: 900, fontSize: 13, color: "#ddd", letterSpacing: 1 }}>SIBANJIR</div>
-            <div style={{ fontFamily: "monospace", fontSize: 9, color: "#444", letterSpacing: 2 }}>PERINGATAN DINI</div>
-          </div>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }} ref={menuRef}>
-          <div style={{
-            background: STATUS[overall].bg,
-            border: `1px solid ${STATUS[overall].border}`,
-            borderRadius: 20, padding: "4px 12px",
-            fontFamily: "monospace", fontSize: 10,
-            color: STATUS[overall].color, letterSpacing: 2,
-            display: "flex", alignItems: "center", gap: 6,
-          }}>
-            <span style={{ fontSize: 8 }}>●</span>
-            {overall.toUpperCase()}
-          </div>
-
-          {/* Hamburger */}
-          <button
-            onClick={() => setMenuOpen(v => !v)}
-            style={{
-              background: menuOpen ? "rgba(0,229,160,0.1)" : "rgba(255,255,255,0.05)",
-              border: `1px solid ${menuOpen ? "rgba(0,229,160,0.3)" : "rgba(255,255,255,0.08)"}`,
-              borderRadius: 8, width: 40, height: 40,
-              display: "flex", flexDirection: "column",
-              alignItems: "center", justifyContent: "center",
-              gap: 5, cursor: "pointer", padding: 0,
-              transition: "all 0.2s", flexShrink: 0,
-            }}
-            aria-label="Toggle menu"
-          >
-            <span style={{ display: "block", width: 18, height: 2, background: menuOpen ? "#00e5a0" : "#888", borderRadius: 2, transition: "all 0.25s", transform: menuOpen ? "translateY(7px) rotate(45deg)" : "none" }} />
-            <span style={{ display: "block", width: 18, height: 2, background: menuOpen ? "transparent" : "#888", borderRadius: 2, transition: "all 0.25s", opacity: menuOpen ? 0 : 1 }} />
-            <span style={{ display: "block", width: 18, height: 2, background: menuOpen ? "#00e5a0" : "#888", borderRadius: 2, transition: "all 0.25s", transform: menuOpen ? "translateY(-7px) rotate(-45deg)" : "none" }} />
-          </button>
-
-          {/* Dropdown */}
-          {menuOpen && (
-            <div style={{
-              position: "absolute", top: 58, right: 0, width: 230,
-              background: "rgba(10,14,22,0.99)", backdropFilter: "blur(20px)",
-              border: "1px solid rgba(255,255,255,0.08)", borderTop: "none",
-              borderRadius: "0 0 0 14px", padding: "10px",
-              boxShadow: "0 24px 60px rgba(0,0,0,0.7)", zIndex: 200,
-            }}>
-              {NAV_ITEMS.map(n => (
-                <button key={n.key} onClick={() => navigate(n.key)} style={{
-                  width: "100%", textAlign: "left",
-                  background: page === n.key ? "rgba(0,229,160,0.08)" : "transparent",
-                  border: "none",
-                  borderLeft: `2px solid ${page === n.key ? "#00e5a0" : "transparent"}`,
-                  color: page === n.key ? "#00e5a0" : "#777",
-                  padding: "11px 14px", borderRadius: "0 6px 6px 0",
-                  fontFamily: "monospace", fontSize: 12,
-                  cursor: "pointer", letterSpacing: 1,
-                  display: "flex", alignItems: "center", gap: 12,
-                  transition: "all 0.15s", marginBottom: 3,
-                }}>
-                  <span style={{ fontSize: 18 }}>{n.icon}</span>
-                  {n.label}
-                </button>
-              ))}
-              <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: 10, padding: "10px 14px 2px" }}>
-                <div style={{ fontFamily: "monospace", fontSize: 9, color: "#333", letterSpacing: 2 }}>UPDATE TERAKHIR</div>
-                <div suppressHydrationWarning style={{ fontFamily: "monospace", fontSize: 12, color: "#555", marginTop: 4 }}>
-                  {time.toLocaleTimeString("id-ID")}
-                </div>
-              </div>
-            </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {page !== "home" && (
+            <button onClick={() => setPage("home")} style={{
+              background: "none", border: "none", cursor: "pointer",
+              fontSize: 18, color: "#3498db", padding: "4px 6px",
+            }}>←</button>
           )}
+          {page === "home" && <span style={{ fontSize: 20 }}>💧</span>}
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#333" }}>
+              {pageTitle[page] || "Status Banjir"}
+            </div>
+            {page === "home" && (
+              <div style={{ fontSize: 10, color: "#aaa" }}>Rambatan Kulon, Indramayu</div>
+            )}
+          </div>
         </div>
-      </nav>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{
+            background: STATUS[overall].bg,
+            border: `1px solid ${STATUS[overall].border}`,
+            borderRadius: 20, padding: "3px 10px",
+            fontSize: 11, fontWeight: 700,
+            color: STATUS[overall].color,
+          }}>
+            {STATUS[overall].label}
+          </div>
+          <button onClick={() => setPage("notifikasi")} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer" }}>🔔</button>
+          <button
+            onClick={() => window.location.href = "/admin/login"}
+            style={{
+              background: "#f0f4f8", border: "1px solid #e0e0e0",
+              borderRadius: 8, padding: "5px 10px",
+              fontSize: 11, color: "#888", cursor: "pointer",
+              fontWeight: 600,
+            }}
+          >
+            Login
+          </button>
+        </div>
+      </div>
 
       {/* ── CONTENT ── */}
-      <main style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 100px" }}>
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontFamily: "monospace", fontSize: 10, color: "#444", letterSpacing: 3, marginBottom: 4 }}>
-            {NAV_ITEMS.find(n => n.key === page)?.icon} {page.toUpperCase()}
-          </div>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: "#ddd", fontFamily: "monospace" }}>
-            {NAV_ITEMS.find(n => n.key === page)?.label}
-          </h1>
-        </div>
-
-        {page === "dashboard"  && <PageDashboard selected={selected} setSelected={setSelected} time={time} />}
-        {page === "peta"       && <PagePeta      selected={selected} setSelected={setSelected} />}
-        {page === "grafik"     && <PageGrafik />}
-        {page === "peringatan" && <PagePeringatan />}
+      <main style={{ maxWidth: 480, margin: "0 auto", padding: "16px 16px 80px" }}>
+        {page === "home"       && <PageHome time={time} selectedLoc={selectedLoc} setSelectedLoc={setSelectedLoc} setPage={setPage} />}
+        {page === "peta"       && <PagePeta />}
+        {page === "posko"      && <PagePosko />}
+        {page === "notifikasi" && <PageNotifikasi />}
       </main>
 
       {/* ── BOTTOM NAV ── */}
       <div style={{
         position: "fixed", bottom: 0, left: 0, right: 0,
-        background: "rgba(8,12,18,0.97)", backdropFilter: "blur(12px)",
-        borderTop: "1px solid rgba(255,255,255,0.06)",
+        background: "#fff", boxShadow: "0 -2px 10px rgba(0,0,0,0.08)",
         display: "flex", justifyContent: "space-around",
-        padding: "8px 0 env(safe-area-inset-bottom, 12px)", zIndex: 50,
+        padding: "8px 0 env(safe-area-inset-bottom, 8px)",
+        zIndex: 100,
       }}>
-        {NAV_ITEMS.map(n => (
-          <button key={n.key} onClick={() => navigate(n.key)} style={{
+        {[
+          { key: "home",       label: "Beranda",    icon: "🏠" },
+          { key: "peta",       label: "Peta",       icon: "📍" },
+          { key: "posko",      label: "Posko",      icon: "🏥" },
+          { key: "notifikasi", label: "Notifikasi", icon: "🔔" },
+        ].map(n => (
+          <button key={n.key} onClick={() => setPage(n.key)} style={{
             background: "none", border: "none",
             display: "flex", flexDirection: "column",
-            alignItems: "center", gap: 3, cursor: "pointer",
-            color: page === n.key ? "#00e5a0" : "#444",
-            padding: "4px 16px", transition: "color 0.15s",
-            borderTop: page === n.key ? "2px solid #00e5a0" : "2px solid transparent",
-            marginTop: -1,
+            alignItems: "center", gap: 2, cursor: "pointer",
+            color: page === n.key ? "#3498db" : "#aaa",
+            padding: "4px 12px", transition: "color 0.15s",
           }}>
-            <span style={{ fontSize: 20, marginTop: 4 }}>{n.icon}</span>
-            <span style={{ fontFamily: "monospace", fontSize: 9, letterSpacing: 1 }}>{n.label}</span>
+            <span style={{ fontSize: 22 }}>{n.icon}</span>
+            <span style={{ fontSize: 10, fontWeight: page === n.key ? 700 : 400 }}>{n.label}</span>
           </button>
         ))}
       </div>
 
       <style>{`
-        * { box-sizing: border-box; }
-        body { margin: 0; overflow-x: hidden; }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #f0f4f8; }
+        button:active { opacity: 0.8; }
+        ::-webkit-scrollbar { display: none; }
+        .leaflet-container { width: 100% !important; height: 100% !important; }
       `}</style>
     </div>
   );
