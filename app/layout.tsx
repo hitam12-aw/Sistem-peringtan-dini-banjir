@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SIBANJIR - Sistem Peringatan Dini Banjir",
-  description: "Sistem peringatan dini banjir Jabodetabek",
+  title: "SI-PERBA - Sistem Peringatan Dini Banjir",
+  description: "Sistem peringatan dini banjir Desa Rambatan Kulon, Indramayu",
 };
 
 export default function RootLayout({
