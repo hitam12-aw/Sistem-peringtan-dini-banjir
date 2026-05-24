@@ -404,6 +404,9 @@ function SectionLokasi({ locations, loading, fetchLocations }) {
   async function saveEdit() {
     setSaving(true);
     await supabase.from("lokasi_banjir").update({
+      nama: form.nama,
+      lat: parseFloat(form.lat),
+      lng: parseFloat(form.lng),
       status: form.status,
       level_air: parseInt(form.level_air),
       curah_hujan: parseInt(form.curah_hujan),
@@ -440,6 +443,24 @@ function SectionLokasi({ locations, loading, fetchLocations }) {
                     <div style={{ fontSize:12, fontWeight:700, color:"rgba(255,255,255,0.6)", marginBottom:14, display:"flex", alignItems:"center", gap:6 }}>
                       <IconEdit size={13} /> Edit — {loc.nama}
                     </div>
+                    
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 12 }}>
+                      <div>
+                        <label className="form-label">Nama Lokasi</label>
+                        <input type="text" value={form.nama || ""} onChange={e => setForm({ ...form, nama: e.target.value })} style={inputStyle} />
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                        <div>
+                          <label className="form-label">Latitude</label>
+                          <input type="number" step="0.000001" value={form.lat || ""} onChange={e => setForm({ ...form, lat: e.target.value })} style={inputStyle} />
+                        </div>
+                        <div>
+                          <label className="form-label">Longitude</label>
+                          <input type="number" step="0.000001" value={form.lng || ""} onChange={e => setForm({ ...form, lng: e.target.value })} style={inputStyle} />
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="form-grid">
                       <div>
                         <label className="form-label">Status</label>
@@ -472,7 +493,8 @@ function SectionLokasi({ locations, loading, fetchLocations }) {
                 ) : (
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:12, flexWrap:"wrap" }}>
                     <div style={{ flex:1 }}>
-                      <div style={{ fontSize:13, fontWeight:700, color:"rgba(255,255,255,0.9)", marginBottom:6 }}>{loc.nama}</div>
+                      <div style={{ fontSize:13, fontWeight:700, color:"rgba(255,255,255,0.9)", marginBottom:2 }}>{loc.nama}</div>
+                      <div style={{ fontSize:10, color:"rgba(255,255,255,0.3)", marginBottom:8 }}>📍 Koordinat: {loc.lat}, {loc.lng}</div>
                       <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
                         <span className={`pill pill-${loc.status}`}>{s.label}</span>
                         <span style={{ fontSize:11, color:"rgba(255,255,255,0.35)" }}>
@@ -832,7 +854,21 @@ function SectionLaporan() {
                       <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                       {l.lokasi}
                     </div>
-                    <div style={{ fontSize:12, color:"rgba(255,255,255,0.55)", lineHeight:1.5 }}>{l.deskripsi}</div>
+                    {(() => {
+                      const parts = l.deskripsi ? l.deskripsi.split(" ||FOTO|| ") : [""];
+                      const text = parts[0];
+                      const foto = parts[1];
+                      return (
+                        <>
+                          <div style={{ fontSize:12, color:"rgba(255,255,255,0.55)", lineHeight:1.5 }}>{text}</div>
+                          {foto && (
+                            <div style={{ marginTop: 8, maxWidth: 280, borderRadius: 10, overflow: "hidden", border: "1px solid rgba(255,255,255,0.12)" }}>
+                              <img src={foto} alt="Foto Laporan" style={{ width: "100%", height: 160, objectFit: "cover", display: "block" }} />
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                     <div style={{ fontSize:10, color:"rgba(255,255,255,0.2)", marginTop:6 }}>
                       {new Date(l.created_at).toLocaleString("id-ID")}
                     </div>
