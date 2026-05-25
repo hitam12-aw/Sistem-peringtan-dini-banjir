@@ -40,11 +40,7 @@ const IconWave = () => (
   </svg>
 );
 
-const IconDroplet = () => (
-  <svg viewBox="0 0 24 24" width="28" height="28" fill="rgba(255,255,255,0.9)" stroke="none">
-    <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
-  </svg>
-);
+
 
 const IconArrowRight = () => (
   <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -155,21 +151,10 @@ export default function LoginPage() {
           margin-bottom: 36px;
         }
         .brand-icon {
-          width: 64px; height: 64px;
-          background: linear-gradient(135deg, #0A61C9, #749DC8);
-          border-radius: 20px;
+          width: 80px; height: 80px;
           display: flex; align-items: center; justify-content: center;
-          margin-bottom: 16px;
-          box-shadow: 0 12px 40px rgba(10,97,201,0.5);
+          margin-bottom: 24px;
           position: relative;
-        }
-        .brand-icon::after {
-          content: '';
-          position: absolute;
-          inset: -1px;
-          border-radius: 21px;
-          background: linear-gradient(135deg, rgba(255,255,255,0.3), transparent);
-          pointer-events: none;
         }
         .brand-name {
           font-size: 26px;
@@ -382,8 +367,18 @@ export default function LoginPage() {
         <div className="login-inner">
           {/* Brand */}
           <div className="brand-wrap">
-            <div className="brand-icon">
-              <IconDroplet />
+            <div className="brand-icon" style={{ overflow: "visible" }}>
+              <img 
+                src="/siperba.png" 
+                alt="Logo SI-PERBA" 
+                style={{ 
+                  width: "100%", 
+                  height: "100%", 
+                  objectFit: "contain", 
+                  transform: "scale(3.5)", 
+                  filter: "drop-shadow(0 8px 24px rgba(10,97,201,0.5))" 
+                }} 
+              />
             </div>
             <div className="brand-name">SI-PERBA</div>
             <div className="brand-sub">Sistem Peringatan Dini Banjir — Indramayu</div>

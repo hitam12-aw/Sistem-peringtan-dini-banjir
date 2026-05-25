@@ -89,11 +89,7 @@ const IconX = ({ size = 14 }) => (
     <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
   </svg>
 );
-const IconDroplet = () => (
-  <svg viewBox="0 0 24 24" width="20" height="20" fill="rgba(255,255,255,0.9)" stroke="none">
-    <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
-  </svg>
-);
+
 const IconLogOut = ({ size = 14 }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
@@ -148,11 +144,8 @@ const GLOBAL_CSS = `
     display: flex; align-items: center; gap: 12px;
   }
   .header-logo {
-    width: 36px; height: 36px;
-    background: linear-gradient(135deg, #0A61C9, #749DC8);
-    border-radius: 10px;
+    width: 32px; height: 32px;
     display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 4px 12px rgba(10,97,201,0.4);
     flex-shrink: 0;
   }
   .header-title { font-size: 15px; font-weight: 700; color: #fff; }
@@ -941,7 +934,18 @@ export default function AdminPage() {
         {/* Header */}
         <div className="admin-header">
           <div className="header-brand">
-            <div className="header-logo"><IconDroplet /></div>
+            <div className="header-logo" style={{ overflow: "visible" }}>
+              <img 
+                src="/siperba.png" 
+                alt="Logo SI-PERBA" 
+                style={{ 
+                  width: "100%", 
+                  height: "100%", 
+                  objectFit: "contain", 
+                  transform: "scale(3.2)" 
+                }} 
+              />
+            </div>
             <div>
               <div className="header-title">SI-PERBA Admin</div>
               <div className="header-sub">Halo, {username}</div>
