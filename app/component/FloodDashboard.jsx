@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { supabase } from "../../lib/supabase";
 
@@ -75,6 +75,31 @@ function formatTime(isoString) {
   if (!isoString) return "--:--";
   const d = new Date(isoString);
   return d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+}
+
+// ─── HELPER: format waktu relatif untuk notifikasi ───────────────────────────
+function formatRelativeTime(isoString) {
+  if (!isoString) return "";
+  const now = new Date();
+  const d = new Date(isoString);
+  const diffMs = now - d;
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHour = Math.floor(diffMs / 3600000);
+  const timeStr = d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+
+  if (diffMin < 1) return "Baru saja";
+  if (diffMin < 60) return `${diffMin} menit lalu`;
+  if (diffHour < 2) return `${diffHour} jam lalu`;
+
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const dateD = new Date(d); dateD.setHours(0, 0, 0, 0);
+  if (dateD.getTime() === today.getTime()) return `Hari ini ${timeStr}`;
+
+  const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+  if (dateD.getTime() === yesterday.getTime()) return `Kemarin ${timeStr}`;
+
+  const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+  return `${d.getDate()} ${months[d.getMonth()]} ${timeStr}`;
 }
 
 // ─── SVG ICONS ────────────────────────────────────────────────────────────────
@@ -786,14 +811,31 @@ function PageLaporan({ reports, onSubmitReport }) {
   const [keterangan, setKeterangan] = useState("");
   const [fotoBase64, setFotoBase64] = useState("");
   const [success, setSuccess] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 1.2 * 1024 * 1024) {
-        alert("Ukuran foto terlalu besar! Harap pilih foto di bawah 1.2 MB.");
+      const allowedExtensions = ["png", "jpg", "jpeg", "webp", "gif", "bmp"];
+      const fileExtension = file.name.split(".").pop().toLowerCase();
+
+      // Validasi ganda: MIME type dan ekstensi file
+      if (!file.type.startsWith("image/") || !allowedExtensions.includes(fileExtension)) {
+        setErrorMsg("Format file tidak didukung! Harap pilih file gambar saja (PNG, JPG, JPEG, WEBP).");
+        e.target.value = ""; // Reset input file
+        setFotoBase64("");
         return;
       }
+
+      if (file.size > 1.2 * 1024 * 1024) {
+        setErrorMsg("Ukuran foto terlalu besar! Harap pilih foto di bawah 1.2 MB.");
+        e.target.value = ""; // Reset input file
+        setFotoBase64("");
+        return;
+      }
+
+      // Bersihkan error jika file berhasil diunggah
+      setErrorMsg("");
       const reader = new FileReader();
       reader.onloadend = () => {
         setFotoBase64(reader.result);
@@ -805,7 +847,7 @@ function PageLaporan({ reports, onSubmitReport }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!nama || !lokasi || !keterangan) {
-      alert("Harap isi semua kolom laporan!");
+      setErrorMsg("Harap isi semua kolom laporan!");
       return;
     }
     onSubmitReport({
@@ -820,6 +862,7 @@ function PageLaporan({ reports, onSubmitReport }) {
     setLokasi("");
     setKeterangan("");
     setFotoBase64("");
+    setErrorMsg("");
     setSuccess(true);
     setTimeout(() => setSuccess(false), 4000);
   };
@@ -847,6 +890,36 @@ function PageLaporan({ reports, onSubmitReport }) {
         {success && (
           <div style={{ background: "#EEF8F3", color: "#1A7A4A", border: "1px solid rgba(26,122,74,0.2)", borderRadius: 12, padding: "12px 14px", fontSize: 12, fontWeight: 600, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
             ✅ Laporan Anda sukses terkirim dan masuk antrean monitoring! Terima kasih atas kepedulian Anda.
+          </div>
+        )}
+
+        {errorMsg && (
+          <div style={{ 
+            background: "#FDF0EF", 
+            color: "#C0392B", 
+            border: "1px solid rgba(192,57,43,0.2)", 
+            borderRadius: 12, 
+            padding: "12px 14px", 
+            fontSize: 12, 
+            fontWeight: 600, 
+            marginBottom: 16, 
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "space-between",
+            gap: 8,
+            animation: "fadeIn 0.3s ease" 
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span>⚠️</span>
+              <span>{errorMsg}</span>
+            </div>
+            <button 
+              type="button" 
+              onClick={() => setErrorMsg("")} 
+              style={{ background: "none", border: "none", color: "#C0392B", cursor: "pointer", fontWeight: "bold", fontSize: 12, padding: "2px 6px" }}
+            >
+              ✕
+            </button>
           </div>
         )}
 
@@ -967,58 +1040,279 @@ function PageLaporan({ reports, onSubmitReport }) {
   );
 }
 
-// ─── PAGE: NOTIFIKASI - REALTIME DARI SUPABASE ───────────────────────────────
-function PageNotifikasi({ alerts }) {
+// ─── PAGE: NOTIFIKASI - EVENT-BASED SMART ALERTS ─────────────────────────────
+function PageNotifikasi({ alerts, sensorData, isOnline }) {
+  const [filter, setFilter] = useState("semua");
+  const [showHistory, setShowHistory] = useState(false);
+  const MAX_VISIBLE = 7;
+
   const iconMap = {
     bahaya: <IconAlert size={16} />,
     waspada: <IconInfo size={16} />,
     aman: <IconCheck size={16} />,
+    system: <IconActivity />,
   };
 
+  const priorityConfig = {
+    bahaya: { label: "BAHAYA", color: "#C0392B", bg: "#FDF0EF", border: "rgba(192,57,43,0.25)", accent: "#E74C3C", iconBg: "linear-gradient(135deg, #C0392B, #E74C3C)" },
+    waspada: { label: "SIAGA", color: "#D4872A", bg: "#FEF8EF", border: "rgba(212,135,42,0.25)", accent: "#E8993A", iconBg: "linear-gradient(135deg, #D4872A, #E8993A)" },
+    aman: { label: "NORMAL", color: "#1A7A4A", bg: "#EEF8F3", border: "rgba(26,122,74,0.25)", accent: "#24A863", iconBg: "linear-gradient(135deg, #1A7A4A, #24A863)" },
+    system: { label: "SISTEM", color: "#0A61C9", bg: "#EEF4FD", border: "rgba(10,97,201,0.25)", accent: "#2980D4", iconBg: "linear-gradient(135deg, #0A61C9, #2980D4)" },
+  };
+
+  // Filter alerts
+  const filtered = filter === "semua" ? alerts : alerts.filter(a => a.level === filter);
+  const visibleAlerts = showHistory ? filtered : filtered.slice(0, MAX_VISIBLE);
+  const hasMore = filtered.length > MAX_VISIBLE;
+
+  // Summary counts
+  const countBahaya = alerts.filter(a => a.level === "bahaya").length;
+  const countSiaga = alerts.filter(a => a.level === "waspada").length;
+  const countNormal = alerts.filter(a => a.level === "aman").length;
+  const countSystem = alerts.filter(a => a.level === "system").length;
+
+  const filters = [
+    { key: "semua", label: "Semua", count: alerts.length },
+    { key: "bahaya", label: "Bahaya", count: countBahaya, color: "#C0392B" },
+    { key: "waspada", label: "Siaga", count: countSiaga, color: "#D4872A" },
+    { key: "aman", label: "Normal", count: countNormal, color: "#1A7A4A" },
+  ];
+
   return (
-    <div className="premium-card" style={{ width: "100%" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-        <div style={{ width: 28, height: 28, borderRadius: 8, background: "#F1F7F9", display: "flex", alignItems: "center", justifyContent: "center", color: "#0A61C9" }}>
-          <IconBell size={16} />
+    <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%" }}>
+      {/* HEADER CARD */}
+      <div className="premium-card" style={{ padding: "16px 20px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: "linear-gradient(135deg, #07326A, #0A61C9)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
+              <IconBell size={18} />
+            </div>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: "#07326A", letterSpacing: "0.2px" }}>Pusat Notifikasi</div>
+              <div style={{ fontSize: 11, color: "#9a9aaa", marginTop: 1 }}>Peringatan perubahan status & event penting</div>
+            </div>
+          </div>
+          {/* Sensor status indicator */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 6,
+            background: isOnline ? "rgba(26,122,74,0.08)" : "rgba(192,57,43,0.08)",
+            border: `1px solid ${isOnline ? "rgba(26,122,74,0.2)" : "rgba(192,57,43,0.2)"}`,
+            borderRadius: 20, padding: "5px 12px",
+          }}>
+            <div style={{
+              width: 7, height: 7, borderRadius: "50%",
+              background: isOnline ? "#1A7A4A" : "#C0392B",
+              animation: isOnline ? "pulse 2s infinite" : "none",
+            }} />
+            <span style={{ fontSize: 10, fontWeight: 600, color: isOnline ? "#1A7A4A" : "#C0392B" }}>
+              {isOnline ? "Sensor Aktif" : "Sensor Offline"}
+            </span>
+          </div>
         </div>
-        <span style={{ fontSize: 13, fontWeight: 700, color: "#07326A" }}>Notifikasi Peringatan</span>
+
+        {/* SUMMARY BAR */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {countBahaya > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 5, background: "rgba(192,57,43,0.08)", border: "1px solid rgba(192,57,43,0.15)", borderRadius: 8, padding: "5px 10px" }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#C0392B" }} />
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#C0392B" }}>{countBahaya} Bahaya</span>
+            </div>
+          )}
+          {countSiaga > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 5, background: "rgba(212,135,42,0.08)", border: "1px solid rgba(212,135,42,0.15)", borderRadius: 8, padding: "5px 10px" }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#D4872A" }} />
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#D4872A" }}>{countSiaga} Siaga</span>
+            </div>
+          )}
+          {countNormal > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 5, background: "rgba(26,122,74,0.08)", border: "1px solid rgba(26,122,74,0.15)", borderRadius: 8, padding: "5px 10px" }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#1A7A4A" }} />
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#1A7A4A" }}>{countNormal} Normal</span>
+            </div>
+          )}
+          {countSystem > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 5, background: "rgba(10,97,201,0.08)", border: "1px solid rgba(10,97,201,0.15)", borderRadius: 8, padding: "5px 10px" }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#0A61C9" }} />
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#0A61C9" }}>{countSystem} Sistem</span>
+            </div>
+          )}
+          {alerts.length === 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 5, background: "rgba(26,122,74,0.08)", border: "1px solid rgba(26,122,74,0.15)", borderRadius: 8, padding: "5px 10px" }}>
+              <IconCheck size={12} />
+              <span style={{ fontSize: 11, fontWeight: 600, color: "#1A7A4A" }}>Semua aman</span>
+            </div>
+          )}
+        </div>
       </div>
 
-      {alerts.length === 0 && (
-        <div style={{ textAlign: "center", color: "#9a9aaa", fontSize: 13, padding: "36px 0" }}>
-          Belum ada notifikasi dari sensor. Semua sistem dalam kondisi aman.
+      {/* LIVE SENSOR DATA CARD */}
+      {sensorData && (
+        <div className="premium-card" style={{ padding: "14px 18px", borderLeft: `4px solid ${isOnline ? "#0A61C9" : "#C0392B"}` }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(10,97,201,0.1)", display: "flex", alignItems: "center", justifyContent: "center", color: "#0A61C9" }}>
+                <IconActivity />
+              </div>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#07326A" }}>Live Monitoring Sensor</div>
+                <div style={{ fontSize: 10, color: "#9a9aaa", marginTop: 1 }}>
+                  Jarak: <b style={{ color: "#07326A" }}>{sensorData.jarak_cm} cm</b> · Float: <b style={{ color: "#07326A" }}>{sensorData.water_level || "--"}</b>
+                </div>
+              </div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{
+                background: STATUS[levelNumToStatus(sensorData.level_num)]?.bg,
+                color: STATUS[levelNumToStatus(sensorData.level_num)]?.color,
+                border: `1px solid ${STATUS[levelNumToStatus(sensorData.level_num)]?.border}`,
+                borderRadius: 20, padding: "3px 10px", fontSize: 10, fontWeight: 700,
+              }}>
+                {STATUS[levelNumToStatus(sensorData.level_num)]?.label}
+              </div>
+              <div style={{ fontSize: 9, color: "#aaa", marginTop: 3 }}>{formatRelativeTime(sensorData.created_at)}</div>
+            </div>
+          </div>
         </div>
       )}
 
-      <div className="alerts-list">
-        {alerts.map((a, idx) => {
-          const s = STATUS[a.level];
-          return (
-            <div key={idx} className="alert-item" style={{
-              background: s.bg,
-              border: `1px solid ${s.border}`,
-              borderRadius: 12, padding: "12px 14px",
-              display: "flex", gap: 12, alignItems: "flex-start",
-            }}>
-              <div style={{
-                width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                background: s.color, color: "#fff",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                {iconMap[a.level]}
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 2 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: s.color }}>Status {s.label}</div>
-                  <div style={{ fontSize: 10, color: "#aaa", flexShrink: 0 }}>{a.time} WIB</div>
-                </div>
-                <div style={{ fontSize: 12, color: "#555", marginBottom: 2, fontWeight: 600 }}>{a.loc}</div>
-                <div style={{ fontSize: 11, color: "#777" }}>{a.msg}</div>
-              </div>
-            </div>
-          );
-        })}
+      {/* FILTER PILLS */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", padding: "0 2px" }}>
+        {filters.map(f => (
+          <button key={f.key} onClick={() => { setFilter(f.key); setShowHistory(false); }} style={{
+            background: filter === f.key ? (f.color || "linear-gradient(135deg, #07326A, #0A61C9)") : "#fff",
+            color: filter === f.key ? "#fff" : (f.color || "#555"),
+            border: `1.5px solid ${filter === f.key ? (f.color || "#0A61C9") : "rgba(7,50,106,0.08)"}`,
+            borderRadius: 20, padding: "6px 14px",
+            fontSize: 11, fontWeight: 600, cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 5,
+            transition: "all 0.2s", fontFamily: "inherit",
+          }}>
+            {f.label}
+            {f.count > 0 && (
+              <span style={{
+                background: filter === f.key ? "rgba(255,255,255,0.25)" : (f.color ? `${f.color}15` : "rgba(7,50,106,0.06)"),
+                borderRadius: 10, padding: "1px 6px", fontSize: 9, fontWeight: 700,
+              }}>{f.count}</span>
+            )}
+          </button>
+        ))}
       </div>
+
+      {/* ALERTS LIST */}
+      {filtered.length === 0 ? (
+        <div className="premium-card" style={{ textAlign: "center", padding: "40px 20px" }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>
+            {filter === "bahaya" ? "🛡️" : filter === "waspada" ? "👁️" : filter === "aman" ? "✅" : "🔔"}
+          </div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#07326A", marginBottom: 6 }}>
+            {filter === "semua" ? "Belum Ada Notifikasi" : `Tidak Ada Notifikasi ${filters.find(f => f.key === filter)?.label}`}
+          </div>
+          <div style={{ fontSize: 12, color: "#9a9aaa", lineHeight: "18px" }}>
+            {filter === "semua"
+              ? "Sistem peringatan dini banjir berjalan normal.\nNotifikasi akan muncul saat terjadi perubahan status."
+              : "Tidak ada peringatan dengan level ini saat ini."
+            }
+          </div>
+        </div>
+      ) : (
+        <div className="notif-alerts-list">
+          {visibleAlerts.map((a, idx) => {
+            const p = priorityConfig[a.level] || priorityConfig.aman;
+            const isCritical = a.level === "bahaya";
+            return (
+              <div key={a.id || idx} className={`notif-card ${isCritical ? "notif-critical" : ""}`} style={{
+                background: "#fff",
+                borderLeft: `4px solid ${p.color}`,
+                borderRadius: 14,
+                padding: "14px 16px",
+                border: `1px solid ${p.border}`,
+                borderLeftWidth: 4,
+                borderLeftColor: p.color,
+                borderLeftStyle: "solid",
+                position: "relative",
+                overflow: "hidden",
+                transition: "all 0.25s cubic-bezier(0.4,0,0.2,1)",
+              }}>
+                {/* Critical pulse overlay */}
+                {isCritical && (
+                  <div style={{
+                    position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+                    background: "rgba(192,57,43,0.03)",
+                    animation: "notifPulse 3s ease-in-out infinite",
+                    pointerEvents: "none",
+                  }} />
+                )}
+                <div style={{ display: "flex", gap: 12, alignItems: "flex-start", position: "relative" }}>
+                  {/* Icon */}
+                  <div style={{
+                    width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+                    background: p.iconBg, color: "#fff",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    boxShadow: `0 4px 12px ${p.color}30`,
+                  }}>
+                    {iconMap[a.level] || iconMap.aman}
+                  </div>
+                  {/* Content */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 4 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{
+                          fontSize: 10, fontWeight: 800, letterSpacing: "0.5px",
+                          color: "#fff", background: p.color,
+                          borderRadius: 6, padding: "2px 8px",
+                        }}>{p.label}</span>
+                        {a.transition && (
+                          <span style={{ fontSize: 9, color: "#aaa", fontWeight: 500 }}>{a.transition}</span>
+                        )}
+                      </div>
+                      <span style={{ fontSize: 10, color: "#aaa", flexShrink: 0, fontWeight: 500 }}>
+                        {a.relativeTime || formatRelativeTime(a.timestamp)}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#07326A", marginBottom: 2 }}>{a.loc}</div>
+                    <div style={{ fontSize: 11, color: "#666", lineHeight: "16px" }}>{a.msg}</div>
+                    {a.detail && (
+                      <div style={{ fontSize: 10, color: "#999", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+                        📊 {a.detail}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* SHOW HISTORY TOGGLE */}
+      {hasMore && !showHistory && (
+        <button onClick={() => setShowHistory(true)} style={{
+          width: "100%", background: "#fff",
+          border: "1.5px dashed rgba(7,50,106,0.12)",
+          borderRadius: 12, padding: "12px",
+          fontSize: 12, fontWeight: 600, color: "#0A61C9",
+          cursor: "pointer", display: "flex",
+          alignItems: "center", justifyContent: "center", gap: 6,
+          transition: "all 0.2s", fontFamily: "inherit",
+        }}>
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+          </svg>
+          Lihat Riwayat Notifikasi ({filtered.length - MAX_VISIBLE} lainnya)
+        </button>
+      )}
+      {showHistory && hasMore && (
+        <button onClick={() => setShowHistory(false)} style={{
+          width: "100%", background: "rgba(7,50,106,0.03)",
+          border: "1.5px solid rgba(7,50,106,0.08)",
+          borderRadius: 12, padding: "10px",
+          fontSize: 11, fontWeight: 600, color: "#666",
+          cursor: "pointer", fontFamily: "inherit",
+          transition: "all 0.2s",
+        }}>
+          ▲ Sembunyikan Riwayat
+        </button>
+      )}
     </div>
   );
 }
@@ -1037,8 +1331,13 @@ export default function App() {
   // ── State data sensor realtime ──
   const [sensorData, setSensorData] = useState(null);   // data terbaru dari ESP32
   const [historyData, setHistoryData] = useState([]);     // untuk grafik
-  const [alerts, setAlerts] = useState([]);     // untuk halaman notifikasi
+  const [alerts, setAlerts] = useState([]);     // untuk halaman notifikasi (event-based)
   const [isOnline, setIsOnline] = useState(false);
+  const previousStatusRef = useRef(null);  // track status sebelumnya untuk deteksi perubahan
+  const previousJarakRef = useRef(null);   // track jarak sebelumnya untuk deteksi lonjakan
+  const alertIdCounter = useRef(0);        // counter unik untuk ID notifikasi
+  const isOnlineRef = useRef(false);       // track online status via ref to avoid stale closures
+  const lastProcessedKeyRef = useRef(null); // track last processed sensor data key to avoid duplicates
   const [weatherData, setWeatherData] = useState([
     { day: "Hari Ini", temp: "28°C", weather: "Hujan Sedang", icon: "🌧️", pop: "80%" },
     { day: "Besok", temp: "27°C", weather: "Hujan Lebat", icon: "⛈️", pop: "95%" },
@@ -1196,6 +1495,7 @@ export default function App() {
 
   // ── Ambil data terbaru dari Supabase ──
   const fetchLatest = async () => {
+    const wasOnline = isOnlineRef.current;
     try {
       const { data, error } = await supabase
         .from("sensor_data")
@@ -1207,8 +1507,13 @@ export default function App() {
       if (error) throw error;
       setSensorData(data);
       setIsOnline(true);
+      isOnlineRef.current = true;
+      processSmartAlerts(data);
+      checkSensorOffline(wasOnline, true);
     } catch {
       setIsOnline(false);
+      isOnlineRef.current = false;
+      checkSensorOffline(wasOnline, false);
     }
   };
 
@@ -1234,44 +1539,141 @@ export default function App() {
     }
   };
 
-  // ── Buat notifikasi dari history ──
-  const fetchAlerts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("sensor_data")
-        .select("*")
-        .neq("status", "AMAN")
-        .neq("status", "ERROR")
-        .order("created_at", { ascending: false })
-        .limit(10);
+  // ── Buat notifikasi berbasis perubahan status (anti-spam) ──
+  const processSmartAlerts = useCallback((newSensorData) => {
+    if (!newSensorData) return;
 
-      if (error) throw error;
-
-      const formatted = data.map(d => {
-        const lvl = levelNumToStatus(d.level_num);
-        const msgMap = {
-          BAHAYA: "Ketinggian air mendekati batas kritis! Waspada banjir!",
-          WASPADA: `Jarak sensor ${d.jarak_cm} cm – air mulai naik`,
-          SIAGA: `Air terdeteksi, pantau terus kondisi`,
-        };
-        return {
-          level: lvl,
-          time: formatTime(d.created_at),
-          loc: "Sensor ESP32 – Rambatan Kulon",
-          msg: msgMap[d.status] || `Status: ${d.status}`,
-        };
-      });
-      setAlerts(formatted);
-    } catch {
-      // Biarkan alerts tetap kosong
+    // Menghindari duplikasi pemrosesan data yang sama dari polling
+    const readingKey = newSensorData.id || newSensorData.created_at;
+    if (readingKey && lastProcessedKeyRef.current === readingKey) {
+      return;
     }
-  };
+    lastProcessedKeyRef.current = readingKey;
+
+    const currentStatus = newSensorData.status; // e.g. "AMAN", "SIAGA", "WASPADA", "BAHAYA"
+    const currentLevel = levelNumToStatus(newSensorData.level_num);
+    const prevStatus = previousStatusRef.current;
+    const prevJarak = previousJarakRef.current;
+    const jarakCm = parseFloat(newSensorData.jarak_cm);
+
+    // Update refs
+    previousStatusRef.current = currentStatus;
+    previousJarakRef.current = jarakCm;
+
+    // Skip jika ini data pertama (inisialisasi) — buat notif awal
+    if (prevStatus === null) {
+      const msgMap = {
+        BAHAYA: "⚠️ Ketinggian air mendekati batas kritis! Segera waspada!",
+        WASPADA: "Air mulai naik, pantau terus perkembangan kondisi",
+        SIAGA: "Air terdeteksi naik, perhatikan perkembangan",
+        AMAN: "Semua sensor dalam kondisi normal",
+      };
+      if (currentStatus !== "AMAN") {
+        alertIdCounter.current += 1;
+        setAlerts(prev => [{
+          id: `init-${alertIdCounter.current}`,
+          level: currentLevel,
+          loc: "Sensor ESP32 – Rambatan Kulon",
+          msg: msgMap[currentStatus] || `Status sensor: ${currentStatus}`,
+          detail: `Jarak sensor: ${jarakCm} cm · Float: ${newSensorData.water_level || "-"}`,
+          timestamp: newSensorData.created_at,
+          relativeTime: formatRelativeTime(newSensorData.created_at),
+        }, ...prev]);
+      }
+      return;
+    }
+
+    // ── DETEKSI PERUBAHAN STATUS ──
+    if (currentStatus !== prevStatus) {
+      const transitionLabel = `${prevStatus} → ${currentStatus}`;
+      const msgMap = {
+        BAHAYA: "🚨 PERINGATAN! Air mendekati batas kritis! Siapkan evakuasi!",
+        WASPADA: "⚠️ Level air meningkat, siaga tinggi diperlukan",
+        SIAGA: "Air mulai terdeteksi naik, pantau perkembangan",
+        AMAN: "✅ Kondisi kembali normal, air sudah surut",
+      };
+      alertIdCounter.current += 1;
+      setAlerts(prev => [{
+        id: `change-${alertIdCounter.current}`,
+        level: currentLevel,
+        transition: transitionLabel,
+        loc: "Sensor ESP32 – Rambatan Kulon",
+        msg: msgMap[currentStatus] || `Perubahan status: ${transitionLabel}`,
+        detail: `Jarak sensor: ${jarakCm} cm · Float: ${newSensorData.water_level || "-"}`,
+        timestamp: newSensorData.created_at,
+        relativeTime: formatRelativeTime(newSensorData.created_at),
+        pinned: currentStatus === "BAHAYA",
+      }, ...prev]);
+      return;
+    }
+
+    // ── DETEKSI KENAIKAN AIR DRASTIS (jarak berkurang > 15cm) ──
+    if (prevJarak !== null && (prevJarak - jarakCm) > 15) {
+      alertIdCounter.current += 1;
+      setAlerts(prev => [{
+        id: `spike-${alertIdCounter.current}`,
+        level: "waspada",
+        loc: "Sensor ESP32 – Rambatan Kulon",
+        msg: "📈 Kenaikan air drastis terdeteksi dalam waktu singkat!",
+        detail: `Perubahan: ${prevJarak} cm → ${jarakCm} cm (selisih ${Math.abs(prevJarak - jarakCm).toFixed(1)} cm)`,
+        timestamp: newSensorData.created_at,
+        relativeTime: formatRelativeTime(newSensorData.created_at),
+      }, ...prev]);
+      return;
+    }
+
+    // ── STATUS SAMA → update timestamp notif terbaru (tanpa card baru) ──
+    setAlerts(prev => {
+      if (prev.length === 0) return prev;
+      const updated = [...prev];
+      updated[0] = { ...updated[0], timestamp: newSensorData.created_at, relativeTime: formatRelativeTime(newSensorData.created_at) };
+      return updated;
+    });
+  }, []);
+
+  // ── Cek sensor offline ──
+  const checkSensorOffline = useCallback((wasOnline, nowOnline) => {
+    if (wasOnline && !nowOnline) {
+      alertIdCounter.current += 1;
+      setAlerts(prev => [{
+        id: `offline-${alertIdCounter.current}`,
+        level: "system",
+        loc: "Sensor ESP32 – Rambatan Kulon",
+        msg: "📡 Koneksi sensor terputus! Periksa perangkat ESP32.",
+        timestamp: new Date().toISOString(),
+        relativeTime: "Baru saja",
+        pinned: true,
+      }, ...prev]);
+    }
+    if (!wasOnline && nowOnline) {
+      alertIdCounter.current += 1;
+      setAlerts(prev => [{
+        id: `online-${alertIdCounter.current}`,
+        level: "aman",
+        loc: "Sensor ESP32 – Rambatan Kulon",
+        msg: "✅ Koneksi sensor kembali aktif.",
+        timestamp: new Date().toISOString(),
+        relativeTime: "Baru saja",
+      }, ...prev]);
+    }
+  }, []);
+
+  // Batas maksimal notifikasi yang disimpan
+  const MAX_ALERTS_STORED = 30;
+  useEffect(() => {
+    if (alerts.length > MAX_ALERTS_STORED) {
+      // Pertahankan pinned alerts + potong sisanya
+      const pinned = alerts.filter(a => a.pinned);
+      const unpinned = alerts.filter(a => !a.pinned).slice(0, MAX_ALERTS_STORED - pinned.length);
+      setAlerts([...pinned.slice(0, 10), ...unpinned]);
+    }
+  }, [alerts]);
 
   // ── Polling setiap 10 detik + realtime subscription ──
   useEffect(() => {
+    // Initial fetch
     fetchLatest();
     fetchHistory();
-    fetchAlerts();
     fetchWargaReports();
     fetchWeather();
     fetchDbLocations();
@@ -1284,7 +1686,6 @@ export default function App() {
     const interval = setInterval(() => {
       fetchLatest();
       fetchHistory();
-      fetchAlerts();
       fetchWargaReports();
       fetchDbLocations();
       fetchDbPoskos();
@@ -1297,10 +1698,13 @@ export default function App() {
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "sensor_data" },
         (payload) => {
+          const wasOnline = isOnlineRef.current;
           setSensorData(payload.new);
           setIsOnline(true);
+          isOnlineRef.current = true;
           fetchHistory();
-          fetchAlerts();
+          processSmartAlerts(payload.new);
+          checkSensorOffline(wasOnline, true);
         }
       )
       .subscribe();
@@ -1453,7 +1857,7 @@ export default function App() {
             {page === "home" && <PageHome time={time} selectedLoc={selectedLoc} setSelectedLoc={setSelectedLoc} setPage={setPage} sensorData={sensorData} historyData={historyData} isOnline={isOnline} weatherData={weatherData} locations={locations} poskos={poskos} />}
             {page === "peta" && <PagePeta locations={locations} poskos={poskos} />}
             {page === "posko" && <PagePosko poskos={poskos} />}
-            {page === "notifikasi" && <PageNotifikasi alerts={alerts} />}
+            {page === "notifikasi" && <PageNotifikasi alerts={alerts} sensorData={sensorData} isOnline={isOnline} />}
             {page === "laporan" && <PageLaporan reports={wargaReports} onSubmitReport={handleAddReport} />}
           </>
         )}
@@ -1721,6 +2125,30 @@ export default function App() {
           margin-bottom: 8px;
         }
 
+        /* Notification cards styles */
+        .notif-alerts-list {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+        .notif-card {
+          box-shadow: 0 2px 8px rgba(7, 50, 106, 0.04);
+        }
+        .notif-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 24px rgba(7, 50, 106, 0.08);
+        }
+        .notif-critical {
+          box-shadow: 0 4px 16px rgba(192, 57, 43, 0.1);
+        }
+        .notif-critical:hover {
+          box-shadow: 0 8px 28px rgba(192, 57, 43, 0.15);
+        }
+        @keyframes notifPulse {
+          0%, 100% { opacity: 0; }
+          50% { opacity: 1; }
+        }
+
         @media (min-width: 768px) {
           .desktop-nav {
             display: flex;
@@ -1780,6 +2208,11 @@ export default function App() {
           .alert-item:hover {
             transform: translateY(-2px);
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+          }
+          .notif-alerts-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+            gap: 12px;
           }
         }
       `}</style>
